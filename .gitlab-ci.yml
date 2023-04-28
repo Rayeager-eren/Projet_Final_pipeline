@@ -1,0 +1,82 @@
+image: docker
+variables:
+ # DOCKER_HOST variable tells docker how to connect to the daemon (a background service running inside the Docker VM)
+  DOCKER_HOST: tcp://docker:2375/
+  # Environemt Variable for docker:dind service explaining to use overlay2 as supporting driver for docker
+  # https://docs.docker.com/storage/storagedriver/overlayfs-driver/
+  DOCKER_DRIVER: overlay2
+  # We need to disable TLS (https://about.gitlab.com/blog/2019/07/31/docker-in-docker-with-docker-19-dot-03/#disable-tls)
+  # to fix the error "docker: Cannot connect to the Docker daemon at tcp://docker:2375. Is the docker daemon running?"
+  DOCKER_TLS_CERTDIR: ""
+services:
+  - docker:dind
+stages:
+- build-n-push-images
+- deploy-dev
+- deploy-prod
+
+build_n_publish:
+  stage: build-n-push-images
+  tags: 
+    - docker
+  before_script:
+  - docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD
+  script:
+  - echo"build images"
+  - docker-compose -f docker-compose-build.yaml build --parallel
+  - echo "push  dev images to dockerhub"
+  - docker image push $DOCKERHUB_USERNAME/result:v1
+  - docker image push $DOCKERHUB_USERNAME/vote:v1
+  - docker image push $DOCKERHUB_USERNAME/worker:v1
+  - docker image push $DOCKERHUB_USERNAME/seed_data:v1
+  - echo "push  prod images to dockerhub"
+  - docker image push $DOCKERHUB_USERNAME/result:v2
+  - docker image push $DOCKERHUB_USERNAME/vote:v2
+  - docker image push $DOCKERHUB_USERNAME/worker:v2
+  - docker image push $DOCKERHUB_USERNAME/seed_data:v2
+  - echo "push dev images to dockerhub"
+  - docker image push $DOCKERHUB_USERNAME/result:v1
+  - docker image push $DOCKERHUB_USERNAME/vote:v1
+  - docker image push $DOCKERHUB_USERNAME/worker:v1
+  - docker image push $DOCKERHUB_USERNAME/seed_data:v1
+  - echo "push prod images to dockerhub"
+  - docker image push $DOCKERHUB_USERNAME/result:v2
+  - docker image push $DOCKERHUB_USERNAME/vote:v2
+  - docker image push $DOCKERHUB_USERNAME/worker:v2
+  - docker image push $DOCKERHUB_USERNAME/seed_data:v2
+
+
+deploy_dev:
+  stage: deploy-dev
+  image: docker:latest
+  tags: 
+    - docker
+  before_script:
+  - chmod $PRIVATE_KEY
+  - scp $PRIVATE_key docker-compose.yaml ubuntu@Ip_dev:/home/ubuntu/
+  script:
+  - ssh -o StrictHostKeyChecking=no -i $PRIVATE_KEY ubuntu@instance_dev_ip
+  - ls &&
+    docker compose down &&
+    docker compose up -d
+    docker images &&
+    docker ps
+  # rules:
+  #     - if: '$ENV == "dev"'
+
+deploy_prod:
+  stage: deploy-prod
+  image: docker:latest
+  tags: 
+    - docker
+  before_script:
+  - chmod $PRIVATE_KEY
+  - scp $PRIVATE_key docker-compose.yaml ubuntu@Ip_prod:/home/ubuntu/
+
+  script:
+  - ssh -o StrictHostKeyChecking=no -i $PRIVATE_KEY ubuntu@instance_prod_ip
+  - ls &&
+    docker compose down &&
+    docker compose up -d
+    docker images &&
+    docker ps

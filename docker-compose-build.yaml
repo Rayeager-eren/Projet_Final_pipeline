@@ -1,0 +1,19 @@
+version: "3"
+services:
+  result:
+      build:
+        context: ./result
+      image: rayger10/result:v2
+  vote:
+      build:
+        context: ./vote
+      image: rayger10/vote:v2
+  worker:
+      build:
+        context: ./worker
+      image: rayger10/worker:v2
+  seed-data:
+      build:
+        context: ./seed-data
+      image: rayger10/seed-data:v2
+ 
